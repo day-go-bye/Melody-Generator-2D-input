@@ -12,7 +12,7 @@ class MelodyGenerator:
     based on a starting sequence.
     """
 
-    def __init__(self, transformer, max_length=25):
+    def __init__(self, transformer, max_length=150):
         """
         Initializes the MelodyGenerator.
 
@@ -47,9 +47,9 @@ class MelodyGenerator:
                 input_tensor, predicted_notes
             )
             
-
         generated_melody = self._decode_generated_sequence(input_tensor)
-
+        print(f"Generated melody: \n{generated_melody}")
+        generated_melody = generated_melody.tolist()
         return generated_melody
 
     def _get_input_tensor(self, start_sequence):
@@ -93,7 +93,7 @@ class MelodyGenerator:
 
             return tf.convert_to_tensor(probabilities)
         
-        temperature = .15
+        temperature = 10
 
         # Apply temperature to the logits
         probabilities = apply_temperature(latest_predictions, temperature)
@@ -105,11 +105,11 @@ class MelodyGenerator:
         print(predicted_note_indeces)
 
         predicted_note1 = predicted_note_indeces.numpy()[0]
-        print("predicted note1:")
+        print("predicted note 1:")
         print(predicted_note1)
 
         predicted_note2 = predicted_note_indeces.numpy()[1]
-        print("predicted note2:")
+        print("predicted note 2:")
         print(predicted_note2)
 
         predicted_notes = [[predicted_note1], [predicted_note2]]
