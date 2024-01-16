@@ -16,11 +16,9 @@ def sinusoidal_position_encoding(num_rows, num_cols, d_model):
     row_angles = _get_angles(np.arange(num_rows)[:, np.newaxis], np.arange(d_model)[np.newaxis, :], d_model)
     col_angles = _get_angles(np.arange(num_cols)[:, np.newaxis], np.arange(d_model)[np.newaxis, :], d_model)
 
-    # Apply sin to even indices in the array; 2i
     row_sines = np.sin(row_angles[:, 0::2])
     row_cosines = np.cos(row_angles[:, 1::2])
 
-    # Apply cos to odd indices in the array; 2i+1
     col_sines = np.sin(col_angles[:, 0::2])
     col_cosines = np.cos(col_angles[:, 1::2])
 
@@ -436,13 +434,13 @@ if __name__ == "__main__":
     d_model = 64
     num_heads = 2
     d_feedforward = 128
-    input_vocab_size = 8
-    target_vocab_size = 8
+    input_vocab_size = 12
+    target_vocab_size = 12
     dropout_dropout_rate = 0.1
     pe_input_rows = 2
-    pe_input_cols = 100
+    pe_input_cols = 1000
     pe_target_rows = 2
-    pe_target_cols = 100
+    pe_target_cols = 1000
 
     # Instantiate the Transformer model
     transformer_model = Transformer(
