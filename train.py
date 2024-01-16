@@ -5,9 +5,10 @@ from keras.optimizers import Adam
 from melodygenerator import MelodyGenerator
 from melodypreprocessor import MelodyPreprocessor
 from transformer import Transformer
+from midiutil import MIDIFile
 
 # Global parameters
-EPOCHS = 10
+EPOCHS = 100
 BATCH_SIZE = 32
 DATA_PATH = "dataset-integers.json"
 MAX_POSITIONS_IN_POSITIONAL_ENCODING = 100
@@ -66,8 +67,6 @@ def _train_step(input, target, transformer):
         # TODO: Add padding mask for encoder + decoder and look-ahead mask
         # for decoder
         predictions = transformer(input, target_input, True, None, None, None)
-        print("predictions:")
-        print(predictions)
 
         # Compute loss between the real output and the predictions
         loss = _calculate_loss(target_real, predictions)
@@ -128,6 +127,46 @@ def _right_pad_sequence_once(sequence):
     """
     return tf.pad(sequence, [[0, 0], [0, 0], [0, 1]], "CONSTANT")
 
+def create_midi_from_string(pairs, output_file='output.mid'):
+    # Create a MIDI file
+    midi = MIDIFile(1)  # One track
+    track = 0
+    time = 0
+
+    # Set track name and tempo
+    midi.addTrackName(track, time, "Generated MIDI")
+    midi.addTempo(track, time, 240)  # Adjust tempo as needed
+
+    # Map integers to MIDI note numbers
+    note_mapping = {
+        1: 60,  # C
+        2: 62,  # D
+        3: 64,  # E
+        4: 65,  # F
+        5: 67,  # G
+        6: 69,  # A
+        7: 71,  # B
+        8: 72,  # High C
+        9: 74,
+        10: 76,
+        11: 77,
+        12: 79
+        # Add more mappings if needed
+    }
+
+    # Convert string of integers to successive quarter notes
+    for pair in pairs:
+        note1, note2 = pair
+
+        
+        midi.addNote(track, 0, note_mapping.get(note1, 60), time, 1, 100)
+        midi.addNote(track, 0, note_mapping.get(note2, 60), time, 1, 100)
+        time += 1
+
+    # Write the MIDI file
+    with open(output_file, "wb") as midi_file:
+        midi.writeFile(midi_file)
+
 
 if __name__ == "__main__":
     melody_preprocessor = MelodyPreprocessor(DATA_PATH, batch_size=BATCH_SIZE)
@@ -142,9 +181,9 @@ if __name__ == "__main__":
         input_vocab_size=vocab_size,
         target_vocab_size=vocab_size,
         pe_input_rows=2,
-        pe_input_cols=100,
+        pe_input_cols=1000,
         pe_target_rows=2,
-        pe_target_cols=100,
+        pe_target_cols=1000,
         dropout_rate=0.1,
     )
 
@@ -154,7 +193,10 @@ if __name__ == "__main__":
     melody_generator = MelodyGenerator(
         transformer_model
     )
-    start_sequence = [[[5, 6, 5, 7, 8],
-                       [1, 4, 3, 2, 3]]]
+    start_sequence = [[[5, 9, 8, 11, 10],
+                       [1, 4, 3, 2, 1]]]
     new_melody = melody_generator.generate(start_sequence)
-    print(f"Generated melody: \n{new_melody}")
+    input_notes = new_melody
+    pairs = [(input_notes[0][0][i], input_notes[0][1][i]) for i in range(0, len(input_notes[0][0]))]
+    create_midi_from_string(pairs, output_file='output.mid')
+
