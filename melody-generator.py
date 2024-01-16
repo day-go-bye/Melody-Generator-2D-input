@@ -1,35 +1,7 @@
-"""
-melody_generator.py
 
-This script defines the MelodyGenerator class, which is responsible for generating
-melodies using a trained Transformer model. The class offers functionality to produce
-a sequence of musical notes, starting from a given seed sequence and extending it
-to a specified maximum length.
-
-The MelodyGenerator class leverages the trained Transformer model's ability to
-predict subsequent notes in a melody based on the current sequence context. It
-achieves this by iteratively appending each predicted note to the existing sequence
-and feeding this extended sequence back into the model for further predictions.
-
-This iterative process continues until the generated melody reaches the desired length
-or an end-of-sequence token is predicted. The class utilizes a tokenizer to encode and
-decode note sequences to and from the format expected by the Transformer model.
-
-Key Components:
-- MelodyGenerator: The primary class defined in this script, responsible for the
-  generation of melodies.
-
-Usage:
-The MelodyGenerator class can be instantiated with a trained Transformer model
-and an appropriate tokenizer. Once instantiated, it can generate melodies by
-calling the `generate` method with a starting note sequence.
-
-Note:
-This class is intended to be used with a Transformer model that has been
-specifically trained for melody generation tasks.
-"""
 
 import tensorflow as tf
+import numpy as np
 
 
 class MelodyGenerator:
@@ -104,12 +76,31 @@ class MelodyGenerator:
         Returns:
             predicted_note (int): The index of the predicted note.
         """
-        
+
         latest_predictions = predictions[:, :, -1, :]
         print("latest_predictions:")
         print(latest_predictions)
 
-        predicted_note_indeces = tf.argmax(latest_predictions[[0]], axis=1)
+        def apply_temperature(logits, temperature):
+            # Ensure that temperature is greater than 0
+            temperature = max(1e-8, temperature)
+
+            # Apply temperature scaling to the logits
+            logits /= temperature
+
+            # Softmax to get probabilities
+            probabilities = np.exp(logits) / np.sum(np.exp(logits), axis=-1, keepdims=True)
+
+            return tf.convert_to_tensor(probabilities)
+        
+        temperature = .15
+
+        # Apply temperature to the logits
+        probabilities = apply_temperature(latest_predictions, temperature)
+        print("probabilities:")
+        print(probabilities)
+
+        predicted_note_indeces = tf.argmax(probabilities[[0]], axis=1)
         print("predicted_note_indeces:")
         print(predicted_note_indeces)
 
@@ -124,6 +115,7 @@ class MelodyGenerator:
         predicted_notes = [[predicted_note1], [predicted_note2]]
 
         return predicted_notes
+    
 
     def _append_predicted_note(self, input_tensor, predicted_notes):
         """
