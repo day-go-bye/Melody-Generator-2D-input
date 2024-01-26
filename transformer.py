@@ -27,8 +27,8 @@ def sinusoidal_position_encoding(num_rows, num_cols, d_model):
 
     pos_encoding = row_pos_encoding[:, np.newaxis, :] + col_pos_encoding[np.newaxis, :, :]
     pos_encoding = pos_encoding[np.newaxis, :]
-    print("pos_encoding:")
-    print(pos_encoding.shape)
+    # print("pos_encoding:")
+    # print(pos_encoding.shape)
 
     return tf.cast(pos_encoding, dtype=tf.float32)
 
@@ -49,6 +49,34 @@ def _get_angles(pos, i, d_model):
         10000, (2 * (i // 2)) / np.float32(d_model)
     )
     return pos * angle_dropout_rates
+
+def create_padding_mask(seq):
+    """
+    Create a padding mask.
+
+    Parameters:
+        seq (Tensor): Input sequence.
+
+    Returns:
+        Tensor: Padding mask.
+    """
+    seq = tf.cast(tf.math.equal(seq, 0), tf.float32)
+    # Add extra dimensions to add the padding to the attention logits.
+    return seq[:, tf.newaxis, tf.newaxis, :]  # (batch_size, 1, 1, seq_len)
+
+
+def create_look_ahead_mask(size):
+    """
+    Create a look-ahead mask.
+
+    Parameters:
+        size (int): Size of the mask.
+
+    Returns:
+        Tensor: Look-ahead mask.
+    """
+    mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
+    return mask  # (size, size)
 
 
 class Transformer(tf.keras.Model):
@@ -200,19 +228,19 @@ class Encoder(tf.keras.layers.Layer):
             Tensor: Output of the Encoder.
         """
 
-        print("X:")
-        print(x.shape)
+        # print("X:")
+        # print(x.shape)
         x = self.embedding(x)  # (batch_size, input_seq_len, d_model)
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-        print("with embedding:")
-        print(x.shape)
+        # print("with embedding:")
+        # print(x.shape)
 
         sliced_pos_encoding = self._get_sliced_positional_encoding(x)
-        print("sliced enc shape:")
-        print(sliced_pos_encoding.shape)
+        # print("sliced enc shape:")
+        # print(sliced_pos_encoding.shape)
         x += sliced_pos_encoding
-        print("added sliced enc shape:")
-        print(x.shape)
+        # print("added sliced enc shape:")
+        # print(x.shape)
 
         x = self.dropout(x, training=training)
 
@@ -466,15 +494,17 @@ if __name__ == "__main__":
         (1, 2, 10), dtype=tf.int64, minval=0, maxval=target_vocab_size
     )
     
-
+    look_ahead_mask = create_look_ahead_mask(dummy_tar.shape[1])
+    enc_padding_mask = create_padding_mask(dummy_inp)
+    dec_padding_mask = create_padding_mask(dummy_tar)
     # Build the model using dummy input
     transformer_model(
         dummy_inp,
         dummy_tar,
         training=False,
-        enc_padding_mask=None,
-        look_ahead_mask=None,
-        dec_padding_mask=None,
+        enc_padding_mask=enc_padding_mask,
+        look_ahead_mask=look_ahead_mask,
+        dec_padding_mask=dec_padding_mask,
     )
 
     # Display the model summary
