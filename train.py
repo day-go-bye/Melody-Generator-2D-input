@@ -34,8 +34,10 @@ def train(train_dataset, transformer, epochs):
         total_loss = 0
         # Iterate over each batch in the training dataset
         for (batch, (input, target)) in enumerate(train_dataset):
+            # Create masks
+            enc_padding_mask, combined_mask, dec_padding_mask = create_masks(input, target)
             # Perform a single training step
-            batch_loss = _train_step(input, target, transformer)
+            batch_loss = _train_step(input, target, transformer, enc_padding_mask, combined_mask, dec_padding_mask)
             total_loss += batch_loss
             print(
                 f"Epoch {epoch + 1} Batch {batch + 1} Loss {batch_loss.numpy()}"
@@ -43,7 +45,7 @@ def train(train_dataset, transformer, epochs):
 
 
 @tf.function
-def _train_step(input, target, transformer):
+def _train_step(input, target, transformer, enc_padding_mask, look_ahead_mask, dec_padding_mask):
     """
     Performs a single training step for the Transformer model.
 
@@ -66,7 +68,7 @@ def _train_step(input, target, transformer):
         # Forward pass through the transformer model
         # TODO: Add padding mask for encoder + decoder and look-ahead mask
         # for decoder
-        predictions = transformer(input, target_input, True, None, None, None)
+        predictions = transformer(input, target_input, True, enc_padding_mask, look_ahead_mask, dec_padding_mask)
 
         # Compute loss between the real output and the predictions
         loss = _calculate_loss(target_real, predictions)
@@ -127,6 +129,25 @@ def _right_pad_sequence_once(sequence):
     """
     return tf.pad(sequence, [[0, 0], [0, 0], [0, 1]], "CONSTANT")
 
+def create_masks(input, target):
+    enc_padding_mask = create_padding_mask(input)
+    dec_padding_mask = create_padding_mask(input)
+
+    look_ahead_mask = create_look_ahead_mask(tf.shape(target)[2])
+    dec_target_padding_mask = create_padding_mask(target)
+    combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
+
+    return enc_padding_mask, combined_mask, dec_padding_mask
+
+def create_padding_mask(seq):
+    seq = tf.cast(tf.math.equal(seq, 0), tf.float32)
+    return seq[:, tf.newaxis, tf.newaxis, :]
+
+def create_look_ahead_mask(size):
+    mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
+    doubled_mask = tf.tile(mask[:, tf.newaxis, :], [1, 2, 1])
+    return doubled_mask
+
 def create_midi_from_string(pairs, output_file='output.mid'):
     # Create a MIDI file
     midi = MIDIFile(1)  # One track
@@ -135,7 +156,7 @@ def create_midi_from_string(pairs, output_file='output.mid'):
 
     # Set track name and tempo
     midi.addTrackName(track, time, "Generated MIDI")
-    midi.addTempo(track, time, 240)  # Adjust tempo as needed
+    midi.addTempo(track, time, 480)  # Adjust tempo as needed
 
     # Map integers to MIDI note numbers
     note_mapping = {
@@ -193,8 +214,8 @@ if __name__ == "__main__":
     melody_generator = MelodyGenerator(
         transformer_model
     )
-    start_sequence = [[[5, 9, 8, 11, 10],
-                       [1, 4, 3, 2, 1]]]
+    start_sequence = [[[5, 4, 5, 10, 9], 
+                       [1, 2, 3, 5, 5]]]
     new_melody = melody_generator.generate(start_sequence)
     input_notes = new_melody
     pairs = [(input_notes[0][0][i], input_notes[0][1][i]) for i in range(0, len(input_notes[0][0]))]
