@@ -76,7 +76,9 @@ def create_look_ahead_mask(size):
         Tensor: Look-ahead mask.
     """
     mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
-    return mask  # (size, size)
+    doubled_mask = tf.tile(mask[:, tf.newaxis, :], [1, 2, 1])
+    doubled_mask = tf.expand_dims(doubled_mask, 0)
+    return doubled_mask
 
 
 class Transformer(tf.keras.Model):
@@ -494,7 +496,7 @@ if __name__ == "__main__":
         (1, 2, 10), dtype=tf.int64, minval=0, maxval=target_vocab_size
     )
     
-    look_ahead_mask = create_look_ahead_mask(dummy_tar.shape[1])
+    look_ahead_mask = create_look_ahead_mask(dummy_tar.shape[2])
     enc_padding_mask = create_padding_mask(dummy_inp)
     dec_padding_mask = create_padding_mask(dummy_tar)
     # Build the model using dummy input
