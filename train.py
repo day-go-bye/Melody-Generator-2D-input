@@ -146,6 +146,7 @@ def create_padding_mask(seq):
 def create_look_ahead_mask(size):
     mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
     doubled_mask = tf.tile(mask[:, tf.newaxis, :], [1, 2, 1])
+    doubled_mask = tf.expand_dims(doubled_mask, 0)
     return doubled_mask
 
 def create_midi_from_string(pairs, output_file='output.mid'):
@@ -215,7 +216,7 @@ if __name__ == "__main__":
         transformer_model
     )
     start_sequence = [[[5, 4, 5, 10, 9], 
-                       [1, 2, 3, 5, 5]]]
+                       [1, 2, 3, 5, 4]]]
     new_melody = melody_generator.generate(start_sequence)
     input_notes = new_melody
     pairs = [(input_notes[0][0][i], input_notes[0][1][i]) for i in range(0, len(input_notes[0][0]))]
