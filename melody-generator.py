@@ -46,14 +46,16 @@ class MelodyGenerator:
 
         for _ in range(num_notes_to_generate):
 
-            prediction = 0
+            prediction_num = 0
 
             # Create masks
             enc_padding_mask, combined_mask, dec_padding_mask = create_masks(input_tensor, input_tensor)
             predictions = self.transformer(
                 input_tensor, input_tensor, False, None, None, None
             )
-            prediction, predicted_notes = self._get_note_with_highest_score(prediction, predictions)
+            print("predictions")
+            print(predictions)
+            predicted_notes = self._get_note_with_highest_score(predictions)
             input_tensor = self._append_predicted_note(input_tensor, predicted_notes)
             
             recent_token_sequence = get_recent_token_sequence(input_tensor)
@@ -66,11 +68,45 @@ class MelodyGenerator:
             print(max_index)
 
             while repeted_paterns > 0:
+                prediction_num += 1
+                print("prediction number:")
+                print(prediction_num)
+
                 # Remove the last item in each row
                 input_tensor = tf.slice(input_tensor, [0, 0, 0], [-1, -1, input_tensor.shape[-1]-1])
+
+                latest_predictions = predictions[:, :, -1, :]
+                print("latest_predictions")
+                print(latest_predictions)
+
+                # Find the indices of the maximum values along the last dimension
+                max_indices = tf.argmax(latest_predictions, axis=-1, output_type=tf.int32)
+                print("max_indices")
+                print(max_indices)
+
+                # Create a one-hot encoding of the indices
+                one_hot_indices = tf.one_hot(max_indices, depth=tf.shape(latest_predictions)[-1])
+
+                # Define a reduction factor (e.g., 0.5) to reduce the maximum values
+                reduction_factor = 0.5
+
+                # Subtract the reduction factor from the maximum values
+                latest_predictions = latest_predictions - reduction_factor * one_hot_indices
+
+                print("latest_predictions adjusted")
+                print(latest_predictions)
+
+                first_part = predictions[:, :, :-1, :]
+                print("first_part")
+                print(first_part)
+
+                # Concatenate the first part with the reduced tensor along the 3rd dimension
+                predictions = tf.concat([first_part, latest_predictions[:, :, tf.newaxis, :]], axis=2)
+                print("predictions")
+                print(predictions)
                 
 
-                prediction, predicted_notes = self._get_note_with_highest_score(prediction, predictions)
+                predicted_notes = self._get_note_with_highest_score(predictions)
                 
                 input_tensor = self._append_predicted_note(input_tensor, predicted_notes)
 
@@ -111,7 +147,7 @@ class MelodyGenerator:
         input_tensor = tf.convert_to_tensor(input_sequence, dtype=tf.int64)
         return input_tensor
 
-    def _get_note_with_highest_score(self, prediction, predictions):
+    def _get_note_with_highest_score(self, predictions):
         """
         Gets the note with the highest score from the predictions.
 
@@ -121,10 +157,8 @@ class MelodyGenerator:
         Returns:
             predicted_note (int): The index of the predicted note.
         """
-        prediction += 1
-        print("prediction number:")
-        print(prediction)
-        latest_predictions = predictions[:, :, -prediction, :]
+        
+        latest_predictions = predictions[:, :, -1, :]
         print("latest_predictions")
         print(latest_predictions)
 
@@ -142,7 +176,7 @@ class MelodyGenerator:
 
         predicted_notes = [[predicted_note1], [predicted_note2]]
 
-        return prediction, predicted_notes
+        return predicted_notes
     
     def apply_temperature(self, logits, temperature):
         # Ensure that temperature is greater than 0
@@ -186,7 +220,20 @@ class MelodyGenerator:
     def calculate_repetition_penalty(self, recent_token_sequence):
         
         # Check for repeated patterns along the last axis (axis=-1)
-        repeated_patterns = tf.reduce_sum(
+        repeated_patterns1 = tf.reduce_sum(
+            tf.cast(
+                tf.math.reduce_all(
+                    tf.equal(
+                        recent_token_sequence[:, :, 1:],
+                        recent_token_sequence[:, :, :-1],
+                    ),
+                    axis=-1,
+                ),
+                tf.float32,
+            )
+        )
+
+        repeated_patterns2 = tf.reduce_sum(
             tf.cast(
                 tf.math.reduce_all(
                     tf.equal(
@@ -198,6 +245,9 @@ class MelodyGenerator:
                 tf.float32,
             )
         )
+
+        
+        repeated_patterns = repeated_patterns1 + repeated_patterns2
 
         print("repeated_patterns")
         print(np.array(repeated_patterns))
