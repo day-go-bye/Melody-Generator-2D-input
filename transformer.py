@@ -156,6 +156,7 @@ class Transformer(tf.keras.Model):
             enc_padding_mask (Tensor): Padding mask for the Encoder.
             look_ahead_mask (Tensor): Look-ahead mask for the Decoder.
             dec_padding_mask (Tensor): Padding mask for the Decoder.
+            recent_token_sequence (Tensor): Recent token sequence.
 
         Returns:
             Tensor: The final output of the Transformer.
@@ -173,7 +174,45 @@ class Transformer(tf.keras.Model):
             dec_output
         )  # (batch_size, target_seq_len, target_vocab_size)
 
-        return logits
+        # Apply repetition penalty
+        logits_with_penalty = repetition_penalty(logits)
+
+        return logits_with_penalty
+    
+    
+    
+
+
+    
+def repetition_penalty(logits, penalty_factor=0.01):
+    """
+    Apply repetition penalty to logits.
+
+    Parameters:
+        logits (tf.Tensor): Logits output by the model.
+        penalty_factor (float): Factor to scale the repetition penalty.
+        min_penalty (float): Minimum value of the repetition penalty.
+
+    Returns:
+        tf.Tensor: Logits with repetition penalty applied.
+    """
+    sequence_length = tf.shape(logits)[-1]
+
+    # Create a mask for recent tokens in the sequence
+    recent_token_mask = tf.linalg.band_part(tf.ones((sequence_length, sequence_length)), 0, -1)
+    recent_token_mask = tf.tile(recent_token_mask[:, tf.newaxis, :], [1, 2, 1])
+    recent_token_mask = tf.expand_dims(recent_token_mask, 0)
+
+    # Calculate the repetition penalty
+    repetition_penalty = tf.pow(tf.reduce_sum(recent_token_mask, axis=-1), penalty_factor)
+    repetition_penalty = tf.expand_dims(repetition_penalty, axis=-1)  # Add an extra dimension
+    # Transpose repetition_penalty for broadcasting
+    repetition_penalty = tf.transpose(repetition_penalty, perm=[0, 2, 3, 1])
+
+    # Apply the repetition penalty to the logits
+    logits_with_penalty = logits - repetition_penalty
+
+    return logits_with_penalty
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -337,6 +376,7 @@ class Decoder(tf.keras.layers.Layer):
             )
 
         return x
+    
 
     def _get_sliced_positional_encoding(self, x):
         """
@@ -471,6 +511,7 @@ if __name__ == "__main__":
     pe_input_cols = 1000
     pe_target_rows = 2
     pe_target_cols = 1000
+    
 
     # Instantiate the Transformer model
     transformer_model = Transformer(
@@ -484,7 +525,7 @@ if __name__ == "__main__":
         pe_input_cols,
         pe_target_rows,
         pe_target_cols,
-        dropout_dropout_rate,
+        dropout_dropout_rate
     )
 
     # Dummy input shapes for encoder and decoder
@@ -506,7 +547,7 @@ if __name__ == "__main__":
         training=False,
         enc_padding_mask=enc_padding_mask,
         look_ahead_mask=look_ahead_mask,
-        dec_padding_mask=dec_padding_mask,
+        dec_padding_mask=dec_padding_mask
     )
 
     # Display the model summary
