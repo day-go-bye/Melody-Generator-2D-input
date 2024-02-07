@@ -8,7 +8,7 @@ from transformer import Transformer
 from midiutil import MIDIFile
 
 # Global parameters
-EPOCHS = 100
+EPOCHS = 20
 BATCH_SIZE = 32
 DATA_PATH = "dataset-integers.json"
 MAX_POSITIONS_IN_POSITIONAL_ENCODING = 100
@@ -209,14 +209,16 @@ if __name__ == "__main__":
         dropout_rate=0.1,
     )
 
+    start_sequence = [[[5, 6, 7, 8], 
+                       [1, 4, 2, 3]]]
+    start_sequence = tf.convert_to_tensor(start_sequence, dtype=tf.int64)
     train(train_dataset, transformer_model, EPOCHS)
 
     print("Generating a melody...")
     melody_generator = MelodyGenerator(
         transformer_model
     )
-    start_sequence = [[[5, 4, 5, 10, 9], 
-                       [1, 2, 3, 5, 4]]]
+    
     new_melody = melody_generator.generate(start_sequence)
     input_notes = new_melody
     pairs = [(input_notes[0][0][i], input_notes[0][1][i]) for i in range(0, len(input_notes[0][0]))]
