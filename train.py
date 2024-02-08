@@ -8,7 +8,7 @@ from transformer import Transformer
 from midiutil import MIDIFile
 
 # Global parameters
-EPOCHS = 20
+EPOCHS = 100
 BATCH_SIZE = 32
 DATA_PATH = "dataset-integers.json"
 MAX_POSITIONS_IN_POSITIONAL_ENCODING = 100
